@@ -44,7 +44,9 @@ static osjob_t sendjob;
 
 // Schedule TX every this many seconds (might become longer due to duty
 // cycle limitations).
-const unsigned TX_INTERVAL = 600; // 10 mins
+const unsigned TX_INTERVAL_MAX = 600; // 10 mins
+const unsigned TX_INTERVAL_MOVING = 120; // 2 mins
+float currentSpeedMPH = 0.0;
 
 // Pin mapping
 //
@@ -110,6 +112,7 @@ void printHex2(unsigned v) {
 }
 
 void onEvent (ev_t ev) {
+  unsigned nextInterval = currentSpeedMPH > 10 ? TX_INTERVAL_MOVING : TX_INTERVAL_MAX;
   Serial.print(os_getTime());
   Serial.print(": ");
   switch (ev) {
@@ -185,7 +188,9 @@ void onEvent (ev_t ev) {
         Serial.println(F(" bytes of payload"));
       }
       // Schedule next transmission
-      os_setTimedCallback(&sendjob, os_getTime() + sec2osticks(TX_INTERVAL), do_send);
+      Serial.print(F("Seconds until next transmission: "));
+      Serial.println(nextInterval);
+      os_setTimedCallback(&sendjob, os_getTime() + sec2osticks(nextInterval), do_send);
       break;
     case EV_LOST_TSYNC:
       Serial.println(F("EV_LOST_TSYNC"));
@@ -297,5 +302,9 @@ void loop() {
       packet.lon = fix.longitudeL();
       packet.stat = fix.status;
     }
+    else {
+        packet = {0};
+    }
+    currentSpeedMPH = fix.valid.speed ? fix.speed_mph() : 0;
   }
 }
